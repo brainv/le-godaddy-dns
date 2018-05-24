@@ -33,6 +33,35 @@ def _get_subdomain_for(domain, zone):
     return subdomain
 
 
+def _add_dns_rec(domain, token):
+    challengedomain = "_acme-challenge." + domain
+    logger.info(" + Adding TXT record for {0} to '{1}'.".format(challengedomain, token))
+    zone = _get_zone(challengedomain)
+    # logger.info("Zone to update: {0}".format(zone))
+    subdomain = _get_subdomain_for(challengedomain, zone)
+    # logger.info("Subdomain name: {0}".format(subdomain))
+
+    record = {
+        'name': subdomain,
+        'data': token,
+        'ttl': 600,
+        'type': 'TXT'
+    }
+    result=None
+    try:
+        result = client.add_record(zone, record)
+    except godaddypy.client.BadResponse as err:
+        msg=str(err)
+        if msg.find('DUPLICATE_RECORD') > -1:
+            logger.info(" + . Duplicate record found. Skipping.")
+            return
+        logger.warn("Error returned {0}.".format(err))
+    if result is not True:
+        logger.warn("Error updating record for domain {0}.".format(domain))
+    else:
+        logger.info(" + . Record added")
+
+
 def _update_dns(domain, token):
     challengedomain = "_acme-challenge." + domain
     logger.info(" + Updating TXT record for {0} to '{1}'.".format(challengedomain, token))
@@ -55,7 +84,7 @@ def _update_dns(domain, token):
 def create_txt_record(args):
     for i in range(0, len(args), 3):
         domain, token = args[i], args[i+2]
-        _update_dns(domain, token)
+        _add_dns_rec(domain, token)
     # a sleep is needed to allow DNS propagation
     time.sleep(30)
 
